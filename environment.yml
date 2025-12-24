@@ -1,0 +1,12 @@
+name: doc_analyzer
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    - python-docx
+    - python-pptx
+    - pypdf
+    - ollama
