@@ -38,3 +38,15 @@ ENV/
 .DS_Store
 Thumbs.db
 Desktop.ini
+# Generated analysis output files
+*.pdf.json
+*.txt.json
+*.docx.json
+*.pptx.json
+*.chunks.json
+*.reduce_raw.txt
+*.reduce_group_*.raw.txt
+
+# Test files
+sample.txt
+sample.txt.*

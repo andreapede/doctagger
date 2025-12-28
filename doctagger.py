@@ -10,7 +10,7 @@ from docx import Document
 from pptx import Presentation
 
 class DocumentAnalyzer:
-    def __init__(self, filepath, model="llama3.2"):
+    def __init__(self, filepath, model="gemma3"):
         self.filepath = filepath
         self.filename = os.path.basename(filepath)
         self.extension = os.path.splitext(filepath)[1].lower()
@@ -142,7 +142,7 @@ class DocumentAnalyzer:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("file", help="File to analyze")
-    parser.add_argument("--model", default="llama3.2", help="Ollama model to use (e.g., llama3.2, mistral)")
+    parser.add_argument("--model", default="gemma3", help="Ollama model to use (e.g., gemma3, mistral)")
     args = parser.parse_args()
 
     if os.path.exists(args.file):

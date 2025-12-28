@@ -1,4 +1,4 @@
-name: doc_analyzer
+name: doctagger
 channels:
   - conda-forge
   - defaults
