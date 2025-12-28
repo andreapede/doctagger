@@ -376,16 +376,57 @@ class DocumentAnalyzer:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("file", help="File to analyze")
-    parser.add_argument(
-        "--model", default="gemma3", help="Ollama model to use (e.g., gemma3, mistral)"
+    parser = argparse.ArgumentParser(
+        prog="doctagger2.py",
+        description="DocTagger – AI-powered document analysis using local Ollama models.",
+        epilog="""
+Examples:
+  # Basic usage with default model (gemma3)
+  python doctagger2.py document.pdf
+  
+  # Use a different model
+  python doctagger2.py document.pdf --model mistral
+  
+  # Save per-chunk summaries
+  python doctagger2.py document.pdf --dump-chunks
+  
+  # Enable reduce debugging (for troubleshooting empty output)
+  python doctagger2.py document.pdf --debug-reduce
+  
+  # Combine multiple flags
+  python doctagger2.py document.pdf --model gemma3 --dump-chunks --debug-reduce
+
+Supported formats: PDF, DOCX, PPTX, TXT
+
+Output files:
+  - <filename>.json – Main analysis with abstract, tags (IT/EN), technical specs, and partial chunks.
+  - <filename>.chunks.json – Per-chunk summaries (with --dump-chunks).
+  - <filename>.reduce_raw.txt – Raw reduce output (with --debug-reduce if JSON parsing failed).
+  - <filename>.reduce_group_<N>.raw.txt – Intermediate group outputs (with --debug-reduce).
+
+For more information, see README.md or run:
+  python doctagger2.py --help
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--dump-chunks", action="store_true", help="Save per-chunk analysis to <filename>.chunks.json"
+        "file",
+        help="Path to the document to analyze (PDF, DOCX, PPTX, or TXT)."
     )
     parser.add_argument(
-        "--debug-reduce", action="store_true", help="Dump raw reduce outputs and use JSON extraction fallback"
+        "--model",
+        default="gemma3",
+        help="Ollama model to use for analysis. Default: gemma3. Examples: mistral, llama2, llama3.2."
+    )
+    parser.add_argument(
+        "--dump-chunks",
+        action="store_true",
+        help="Save per-chunk analysis (index, char count, summary, error, timestamp) to <filename>.chunks.json."
+    )
+    parser.add_argument(
+        "--debug-reduce",
+        action="store_true",
+        help="Dump raw reduce outputs and enable JSON extraction fallback. Writes <filename>.reduce_raw.txt and optionally <filename>.reduce_group_*.raw.txt."
     )
     args = parser.parse_args()
 

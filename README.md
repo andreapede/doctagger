@@ -71,6 +71,20 @@ ollama pull llama2
 
 ## Usage
 
+### Quick Help
+
+View all available options and examples:
+
+```bash
+python doctagger2.py --help
+```
+
+This displays:
+- All command-line arguments with descriptions.
+- 5 usage examples (basic, different model, chunk dump, debugging, combined flags).
+- Output file descriptions.
+- Supported formats.
+
 ### Basic Usage
 
 Analyze a document with the default model (`gemma3`):
