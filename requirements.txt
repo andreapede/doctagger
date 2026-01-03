@@ -1,0 +1,4 @@
+ollama
+pypdf
+python-docx
+python-pptx

@@ -76,7 +76,7 @@ ollama pull llama2
 View all available options and examples:
 
 ```bash
-python doctagger2.py --help
+python doctagger.py --help
 ```
 
 This displays:
@@ -91,11 +91,11 @@ Analyze a document with the default model (`gemma3`):
 
 ```bash
 # Using conda environment (Windows)
-C:/ProgramData/miniconda3/Scripts/conda.exe run -p C:\Users\<your-user>\.conda\envs\doctagger python doctagger2.py path/to/document.pdf
+C:/ProgramData/miniconda3/Scripts/conda.exe run -p C:\Users\<your-user>\.conda\envs\doctagger python doctagger.py path/to/document.pdf
 
 # Or if conda is initialized:
 conda activate doctagger
-python doctagger2.py path/to/document.pdf
+python doctagger.py path/to/document.pdf
 ```
 
 ### Advanced Usage
@@ -103,7 +103,7 @@ python doctagger2.py path/to/document.pdf
 #### Specify a Different Model
 
 ```bash
-python doctagger2.py path/to/document.pdf --model mistral
+python doctagger.py path/to/document.pdf --model mistral
 ```
 
 #### Dump Per-Chunk Summaries
@@ -111,7 +111,7 @@ python doctagger2.py path/to/document.pdf --model mistral
 Save individual chunk analyses to `<filename>.chunks.json`:
 
 ```bash
-python doctagger2.py path/to/document.pdf --dump-chunks
+python doctagger.py path/to/document.pdf --dump-chunks
 ```
 
 Output file includes:
@@ -122,7 +122,7 @@ Output file includes:
 Save raw reduce outputs for troubleshooting JSON parsing:
 
 ```bash
-python doctagger2.py path/to/document.pdf --debug-reduce
+python doctagger.py path/to/document.pdf --debug-reduce
 ```
 
 Output files:
@@ -134,13 +134,8 @@ Useful if the final abstract/tags appear empty; inspect raw output to understand
 #### Combine Flags
 
 ```bash
-python doctagger2.py path/to/document.pdf --model gemma3 --dump-chunks --debug-reduce
+python doctagger.py path/to/document.pdf --model gemma3 --dump-chunks --debug-reduce
 ```
-
-### Script Variants
-
-- **`doctagger2.py`** (recommended): Includes hierarchical map-reduce with fallbacks, per-chunk tracking, and debugging.
-- **`doctagger.py`**: Simpler version with basic map-reduce (older, fewer options).
 
 ## Output
 
@@ -230,7 +225,7 @@ The tool generates a `.json` file with the same name as the input file (e.g., `d
 2. Verify the model is installed: `ollama list`.
 3. Enable debug mode to inspect raw outputs:
    ```bash
-   python doctagger2.py path/to/document.pdf --debug-reduce
+   python doctagger.py path/to/document.pdf --debug-reduce
    ```
 4. Check `<filename>.reduce_raw.txt` to see what the model actually returned.
 

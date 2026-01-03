@@ -46,6 +46,7 @@ Desktop.ini
 *.chunks.json
 *.reduce_raw.txt
 *.reduce_group_*.raw.txt
+*.pdf
 
 # Test files
 sample.txt
