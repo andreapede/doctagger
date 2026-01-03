@@ -13,7 +13,20 @@ from pptx import Presentation
 
 
 class DocumentAnalyzer:
+    """
+    Main class for analyzing documents using local LLMs via Ollama.
+    Handles file reading, text extraction, chunking, and Map-Reduce analysis.
+    """
     def __init__(self, filepath, model="gemma3", dump_chunks=False, debug_reduce=False):
+        """
+        Initialize the analyzer.
+
+        Args:
+            filepath (str): Path to the input file.
+            model (str): Name of the Ollama model to use (default: "gemma3").
+            dump_chunks (bool): Whether to save intermediate chunk analysis to a separate JSON file.
+            debug_reduce (bool): Whether to save raw outputs from the reduce phase for debugging.
+        """
         self.filepath = filepath
         self.filename = os.path.basename(filepath)
         self.extension = os.path.splitext(filepath)[1].lower()
@@ -24,7 +37,20 @@ class DocumentAnalyzer:
         self.debug_reduce = debug_reduce
 
     def _ollama_json_chat(self, prompt, options=None, retries=2):
-        """Call Ollama expecting JSON and parse safely, with low temperature and retries."""
+        """
+        Call Ollama expecting a JSON response and parse it safely.
+        
+        Uses low temperature for deterministic output and includes retry logic.
+        Falls back to manual JSON extraction if the model returns text with embedded JSON.
+
+        Args:
+            prompt (str): The prompt to send to the model.
+            options (dict, optional): Ollama options (e.g., temperature). Defaults to temperature=0.
+            retries (int): Number of retry attempts on failure.
+
+        Returns:
+            dict: The parsed JSON object, or an empty dict if failure.
+        """
         for attempt in range(retries):
             try:
                 response = ollama.chat(
@@ -38,6 +64,7 @@ class DocumentAnalyzer:
                 try:
                     data = json.loads(content) if content else {}
                 except json.JSONDecodeError:
+                    # Fallback: try to find JSON object within the text
                     data = self._extract_json_object(content)
 
                 if isinstance(data, dict) and data:
@@ -49,13 +76,27 @@ class DocumentAnalyzer:
         return {}
 
     def _normalize_tags_field(self, v):
-        """Normalize a tags/spec field to list[str]. Accepts list, str, dict-indexed."""
+        """
+        Normalize a tags or specs field to a list of strings.
+        
+        Handles various input formats that the LLM might return:
+        - None -> []
+        - list -> list of strings (stripped)
+        - dict -> values sorted by numeric keys (e.g., {"0": "tag1", "1": "tag2"})
+        - str -> split by newlines, semicolons, or commas
+
+        Args:
+            v: The value to normalize.
+
+        Returns:
+            list[str]: A clean list of strings.
+        """
         if v is None:
             return []
         if isinstance(v, list):
             return [str(x).strip() for x in v if str(x).strip()]
         if isinstance(v, dict):
-            # dict indicizzato {"0":"a","1":"b"} o simili
+            # Handle indexed dicts like {"0":"a","1":"b"}
             if all(str(k).isdigit() for k in v.keys()):
                 return [str(v[k]).strip() for k in sorted(v.keys(), key=lambda x: int(x)) if str(v[k]).strip()]
             return []
@@ -70,7 +111,18 @@ class DocumentAnalyzer:
         return [s] if s else []
 
     def _rank_union(self, list_of_lists, top_n=10):
-        """Union + ranking by frequency (case-insensitive), preserving most common display form."""
+        """
+        Aggregate lists of tags from multiple chunks and rank them by frequency.
+        
+        Performs case-insensitive counting but preserves the most common display form.
+
+        Args:
+            list_of_lists (list[list[str]]): List of tag lists from chunks.
+            top_n (int): Number of top tags to return.
+
+        Returns:
+            list[str]: The top N most frequent tags.
+        """
         counts = Counter()
         display = defaultdict(Counter)
 
@@ -93,7 +145,19 @@ class DocumentAnalyzer:
         return out
 
     def _deduplicate_tags_llm(self, tags, language="it"):
-        """Use LLM to remove semantic duplicates from a list of tags."""
+        """
+        Use the LLM to semantically deduplicate and clean a list of tags.
+        
+        This step helps remove synonyms, singular/plural variations, and ensures
+        terminological consistency.
+
+        Args:
+            tags (list[str]): The list of tags to clean.
+            language (str): 'it' or 'en' to guide the LLM.
+
+        Returns:
+            list[str]: The cleaned and deduplicated list of tags.
+        """
         if not tags:
             return []
 
@@ -118,7 +182,17 @@ OUTPUT JSON:
         return cleaned
 
     def _extract_json_object(self, text):
-        """Attempt to extract a JSON object from free-form text by bracket matching."""
+        """
+        Attempt to extract a valid JSON object from a string containing free text.
+        
+        Scans for matching curly braces '{' and '}' to isolate potential JSON blocks.
+
+        Args:
+            text (str): The text containing JSON.
+
+        Returns:
+            dict: The extracted dictionary, or empty if none found.
+        """
         if not text:
             return {}
         start = text.find("{")
@@ -142,6 +216,13 @@ OUTPUT JSON:
         return {}
 
     def process(self):
+        """
+        Main execution method.
+        1. Extracts system metadata.
+        2. Extracts text content.
+        3. Runs AI analysis (Map-Reduce).
+        4. Saves results to JSON.
+        """
         print(f"[*] Processing file: {self.filename}...")
         self._extract_system_metadata()
 
@@ -162,6 +243,7 @@ OUTPUT JSON:
         print(f"[V] Done. Metadata saved in {self.filename}.json")
 
     def _extract_system_metadata(self):
+        """Extract file system metadata (size, creation/modification dates)."""
         stats = os.stat(self.filepath)
         if platform.system() == "Windows":
             creation_time = stats.st_ctime
@@ -180,6 +262,10 @@ OUTPUT JSON:
         }
 
     def _extract_text(self):
+        """
+        Extract text content based on file extension.
+        Supports .txt, .pdf, .docx, .pptx.
+        """
         if self.extension == ".txt":
             with open(self.filepath, "r", encoding="utf-8") as f:
                 self.content = f.read()
@@ -202,6 +288,14 @@ OUTPUT JSON:
         self.content = self.content.strip()
 
     def _analyze_content_ai(self):
+        """
+        Perform the Map-Reduce analysis using the LLM.
+        
+        Phase 1: Chunking
+        Phase 2: Map (Analyze each chunk for summary, tags, specs)
+        Phase 2b: Local Aggregation (Rank and deduplicate tags)
+        Phase 3: Reduce (Hierarchically summarize chunks into a final abstract)
+        """
         print(f"[*] Avvio analisi profonda (Map-Reduce) su {len(self.content)} caratteri...")
 
         # 1. CHUNKING
@@ -297,6 +391,10 @@ TESTO:
         print("[*] Generazione Abstract Finale e Tag...")
 
         def hierarchical_reduce(summaries):
+            """
+            Recursively reduce summaries in groups to fit context window.
+            Groups summaries (e.g., by 6), summarizes the group, then summarizes the results.
+            """
             if not summaries:
                 return {}
 
@@ -379,7 +477,10 @@ INPUT:
             return {}
 
         def fallback_reduce(summaries, fields_to_fetch=None):
-            """Fallback: ask for fields one by one and merge."""
+            """
+            Fallback strategy: ask for fields one by one and merge.
+            Used when the main reduce step fails to return a complete JSON object.
+            """
             base_text = "\n---\n".join(summaries)
 
             prompts = {
@@ -463,6 +564,7 @@ INPUT:
             }
 
     def _save_chunks_json(self, partials):
+        """Save intermediate chunk analysis to a separate JSON file."""
         output_filename = f"{self.filename}.chunks.json"
         with open(output_filename, "w", encoding="utf-8") as f:
             json.dump({
@@ -473,7 +575,17 @@ INPUT:
         print(f"[*] Dump dei chunk salvato in {output_filename}")
 
     def _smart_chunking(self, text, chunk_size=6000, overlap=500):
-        """Divide il testo in chunk con sovrapposizione."""
+        """
+        Split text into chunks with overlap, respecting word boundaries.
+        
+        Args:
+            text (str): The full text content.
+            chunk_size (int): Maximum characters per chunk.
+            overlap (int): Number of characters to overlap between chunks.
+
+        Returns:
+            list[str]: List of text chunks.
+        """
         if len(text) <= chunk_size:
             return [text]
 
@@ -488,6 +600,7 @@ INPUT:
                 chunks.append(text[start:])
                 break
 
+            # Try to break at a space to avoid cutting words
             snippet = text[end - 100 : end]
             last_space = snippet.rfind(" ")
 
@@ -501,6 +614,7 @@ INPUT:
         return chunks
 
     def _save_json(self):
+        """Save the final analysis metadata to a JSON file."""
         output_filename = f"{self.filename}.json"
         with open(output_filename, "w", encoding="utf-8") as f:
             json.dump(self.metadata, f, indent=4, ensure_ascii=False)
