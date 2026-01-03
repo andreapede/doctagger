@@ -10,12 +10,11 @@ DocTagger is a Python tool that analyzes documents (PDF, DOCX, PPTX, TXT) to ext
   - Chunks documents into manageable pieces (default 6000 chars with 500 char overlap).
   - Performs per-chunk analysis (MAP phase).
   - Hierarchically reduces summaries with group-level condensing.
-  - Falls back to field-by-field prompts if JSON parsing fails.
+  - Falls back to field-by-field prompts (abstract only) if JSON parsing fails.
 - **AI Analysis**: Uses local Ollama models (e.g., Gemma3, Mistral, Llama) to generate:
-  - Abstract in English (~300-400 words) with scope, methodology, results, conclusions.
-  - 10 technical tags in Italian (`tags_it`).
-  - 10 technical tags in English (`tags_en`).
-  - List of tools, software, and algorithms mentioned (`technical_specs`).
+  - Abstract in English (~300-400 words) with scope, methodology, results, conclusions (REDUCE phase).
+  - Technical tags in Italian and English (extracted per-chunk in MAP, then ranked and deduplicated).
+  - Technical specs (tools/software/standards/algorithms) extracted per-chunk and ranked.
 - **Per-Chunk Debugging**: Optionally save individual chunk summaries with errors.
 - **Reduce Pipeline Debugging**: Optionally dump raw reduce outputs and JSON extraction attempts.
 - **JSON Output**: Saves complete analysis results including partial chunks and metadata.
@@ -171,6 +170,9 @@ The tool generates a `.json` file with the same name as the input file (e.g., `d
         "index": 0,
         "chunk_chars": 5984,
         "summary": "Summary of chunk 0...",
+        "tags_it": ["..."],
+        "tags_en": ["..."],
+        "technical_specs": ["..."],
         "error": null,
         "model": "gemma3",
         "timestamp": "2025-12-28T13:00:00.000000"
@@ -194,16 +196,21 @@ The tool generates a `.json` file with the same name as the input file (e.g., `d
 
 1. **Extraction**: Text is extracted from the document based on its file type.
 2. **Chunking**: Text is divided into overlapping chunks (default: 6000 chars with 500 char overlap) to avoid exceeding LLM context limits.
-3. **MAP Phase**: Each chunk is independently analyzed to extract key technical points, methodologies, and results.
-4. **Hierarchical REDUCE**: 
-   - Chunks are grouped (size 6) and intermediate summaries are condensed.
-   - All condensed summaries are merged into a single final prompt.
-   - The model generates structured JSON with abstract, tags (IT/EN), and technical specs.
-5. **Fallback Strategy**:
-   - If the final reduce doesn't return valid JSON, the pipeline:
-     - Attempts to extract JSON from free-form text.
-     - Falls back to asking for each field (`abstract`, `tags_it`, `tags_en`, `technical_specs`) separately.
-   - This ensures the final JSON is never empty, even if the model struggles with strict JSON formatting.
+3. **MAP Phase**: Each chunk is independently analyzed and the model returns JSON fields:
+  - `summary` (English)
+  - `tags_it` (Italian tags)
+  - `tags_en` (English tags)
+  - `technical_specs` (tools/software/standards/algorithms)
+4. **Local Aggregation (Tags/Specs)**:
+  - Tags/specs from all chunks are merged and ranked by frequency.
+  - Italian/English tag lists are then semantically deduplicated using the model (e.g., singular/plural, close synonyms).
+5. **Hierarchical REDUCE (Abstract Only)**:
+  - Chunk summaries are grouped (size 6) and condensed to fit the model context.
+  - The model produces structured JSON containing only the final `abstract`.
+6. **Fallback Strategy (Abstract Only)**:
+  - If the final reduce doesn't return valid JSON, the pipeline:
+    - Attempts to extract JSON from free-form text.
+    - Falls back to re-asking only the `abstract` field.
 
 ### Temperature & Retries
 
@@ -227,7 +234,11 @@ The tool generates a `.json` file with the same name as the input file (e.g., `d
    ```bash
    python doctagger.py path/to/document.pdf --debug-reduce
    ```
-4. Check `<filename>.reduce_raw.txt` to see what the model actually returned.
+4. Check `<filename>.reduce_raw.txt` to see what the model actually returned (abstract reduce phase).
+5. For missing/low-quality tags, enable chunk dumps and inspect per-chunk outputs:
+  ```bash
+  python doctagger.py path/to/document.pdf --dump-chunks
+  ```
 
 ### Model Not Found Error
 
